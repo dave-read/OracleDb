@@ -8,8 +8,8 @@ Param(
     [switch] $UploadArtifacts,
     [string] $StorageAccountName,
     [string] $StorageContainerName = $ResourceGroupName.ToLowerInvariant() + '-stageartifacts',
-    [string] $TemplateFile = 'LinuxVirtualMachine.json',
-    [string] $TemplateParametersFile = 'LinuxVirtualMachine.parameters.json',
+    [string] $TemplateFile = 'oracle.json',
+    [string] $TemplateParametersFile = 'oracle-primary-site.parameters.json',
     [string] $ArtifactStagingDirectory = '.',
     [string] $DSCSourceFolder = 'DSC',
     [switch] $ValidateOnly

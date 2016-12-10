@@ -1,0 +1,457 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "User name for the Virtual Machine."
+      }
+    },
+    "sshKeyData": {
+      "type": "string",
+      "metadata": {
+        "description": "SSH rsa public key file as a string."
+      }
+    },
+    "dnsNameForPublicIP": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "Globally unique DNS Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/16",
+      "metadata": {
+        "description": "VNET prefix"
+      }
+    },
+    "adminSubnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.1.0/24",
+      "metadata": {
+        "description": "VNET prefix"
+      }
+    },
+    "appSubnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.2.0/24",
+      "metadata": {
+        "description": "VNET prefix"
+      }
+    },
+    "dbSubnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.3.0/24",
+      "metadata": {
+        "description": "VNET prefix"
+      }
+    },
+    "appStorageSku": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "metadata": {
+        "description": "StorageSku for App"
+      }
+    },
+    "dbStorageSku": {
+      "type": "string",
+      "defaultValue": "Premium_LRS",
+      "metadata": {
+        "description": "StorageSku for DB"
+      }
+    },
+    "dbServerVmSize": {
+      "type": "string",
+      "defaultValue": "Standard_DS2_v2",
+      "metadata": {
+        "description": "VM Size (SKU) for Db server"
+      }
+    },
+    "dbServers": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "hostName": "k102-db1",
+          "ip": "10.0.3.100"
+        },
+        {
+          "hostName": "xjb-db2",
+          "ip": "10.0.3.110"
+        }
+      ],
+      "metadata": {
+        "description": "dabase servers"
+      }
+    },
+
+    "appServerVmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D2_v2",
+      "metadata": {
+        "description": "VM Size (SKU) for app server"
+      }
+    },
+    "appServers": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "hostName": "app1",
+          "ip": "10.0.2.10"
+        },
+        {
+          "hostName": "app2",
+          "ip": "10.0.2.11"
+        },
+        {
+          "hostName": "app3",
+          "ip": "10.0.2.12"
+        }
+      ],
+      "metadata": {
+        "description": "app servers"
+      }
+    }
+
+  },
+  "variables": {
+    "apiVersion": "2015-06-15",
+
+    "appImagePublisher": "OpenLogic",
+    "appImageOffer": "CentOS",
+    "appImageSKU": "6.8",
+
+    "dbImagePublisher": "Oracle",
+    "dbImageOffer": "Oracle-Linux",
+    "dbImageSKU": "7.2",
+
+    "sshKeyPath": "[concat('/home/',parameters('adminUserName'),'/.ssh/authorized_keys')]",
+    "storageUnique": "[uniqueString(resourceGroup().id,'storage')]",
+
+    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks','Vnet')]",
+    "adminSubnetRef": "[concat(variables('vnetID'),'/subnets/AdminSubnet')]",
+    "appSubnetRef": "[concat(variables('vnetID'),'/subnets/AppSubnet')]",
+    "dbSubnetRef": "[concat(variables('vnetID'),'/subnets/DbSubnet')]"
+
+  },
+  "resources": [
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "AppAvailabilitySet",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "AppAvailabilitySet"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "DbAvailabilitySet",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "DbAvailabilitySet"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "AdminAvailabilitySet",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "AdminAvailabilitySet"
+      }
+    },
+
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[concat(string(copyIndex()), 'a',variables('storageUnique'))]",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "StorageAccount"
+      },
+      "copy": {
+        "name": "appStorageLoop",
+        "count": "[length(parameters('dbServers'))]"
+      },
+      "properties": {
+        "accountType": "[parameters('appStorageSku')]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[concat(string(copyIndex()), 'd',variables('storageUnique'))]",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "StorageAccount"
+      },
+      "copy": {
+        "name": "dbStorageLoop",
+        "count": "[length(parameters('dbServers'))]"
+      },
+      "properties": {
+        "accountType": "[parameters('dbStorageSku')]"
+      }
+    },
+    {
+      "name": "Vnet",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [],
+      "tags": {
+        "displayName": "Vnet"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "AdminSubnet",
+            "properties": {
+              "addressPrefix": "[parameters('adminSubnetAddressPrefix')]"
+            }
+          },
+          {
+            "name": "AppSubnet",
+            "properties": {
+              "addressPrefix": "[parameters('appSubnetAddressPrefix')]"
+            }
+          },
+          {
+            "name": "DbSubnet",
+            "properties": {
+              "addressPrefix": "[parameters('dbSubnetAddressPrefix')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('appServers')[copyindex()].hostName,'-nic')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NetworkInterface"
+      },
+      "copy": {
+        "name": "appNicLoop",
+        "count": "[length(parameters('appServers'))]"
+      },
+      "dependsOn": [
+        "Microsoft.Network/virtualNetworks/Vnet"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[parameters('appServers')[copyindex()].ip]",
+              "subnet": {
+                "id": "[variables('appSubnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('dbServers')[copyindex()].hostName,'-nic')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NetworkInterface"
+      },
+      "copy": {
+        "name": "dbNicLoop",
+        "count": "[length(parameters('dbServers'))]"
+      },
+      "dependsOn": [
+        "Microsoft.Network/virtualNetworks/Vnet"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[parameters('dbServers')[copyindex()].ip]",
+              "subnet": {
+                "id": "[variables('dbSubnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "jumbBox-nic",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NetworkInterface"
+      },
+      "dependsOn": [
+        "Microsoft.Network/virtualNetworks/Vnet"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('adminSubnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('appServers')[copyindex()].hostName]",
+      "copy": {
+        "name": "appServerVmLoop",
+        "count": "[length(parameters('appServers'))]"
+      },
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VirtualMachines"
+      },
+      "dependsOn": [
+        "appStorageLoop",
+        "[concat('Microsoft.Network/networkInterfaces/', parameters('appServers')[copyindex()].hostName,'-nic')]",
+        "Microsoft.Compute/availabilitySets/AppAvailabilitySet"
+      ],
+      "properties": {
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets','AppAvailabilitySet')]"
+        },
+        "hardwareProfile": {
+          "vmSize": "[parameters('appServerVmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('appServers')[copyindex()].hostName]",
+          "adminUsername": "[parameters('adminUserName')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": "true",
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[variables('sshKeyPath')]",
+                  "keyData": "[parameters('sshKeyData')]"
+                }
+              ]
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('appImagePublisher')]",
+            "offer": "[variables('appImageOffer')]",
+            "sku": "[variables('appImageSKU')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk",
+            "vhd": {
+              "uri": "[concat('http://', string(copyIndex()), 'a',variables('storageUnique'),'.blob.core.windows.net/vhds/',parameters('appServers')[copyindex()].hostName,'.osdisk.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat('app', copyindex(), 'Nic'))]"
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('dbServers')[copyindex()].hostName]",
+      "copy": {
+        "name": "dbServerVmLoop",
+        "count": "[length(parameters('dbServers'))]"
+      },
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VirtualMachines"
+      },
+      "dependsOn": [
+        "dbStorageLoop",
+        "[concat('Microsoft.Network/networkInterfaces/', parameters('dbServers')[copyindex()].hostName,'-nic')]",
+        "Microsoft.Compute/availabilitySets/DbAvailabilitySet"
+      ],
+      "properties": {
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets','DbAvailabilitySet')]"
+        },
+        "hardwareProfile": {
+          "vmSize": "[parameters('dbServerVmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('dbServers')[copyindex()].hostName]",
+          "adminUsername": "[parameters('adminUserName')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": "true",
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[variables('sshKeyPath')]",
+                  "keyData": "[parameters('sshKeyData')]"
+                }
+              ]
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('dbImagePublisher')]",
+            "offer": "[variables('dbImageOffer')]",
+            "sku": "[variables('dbImageSKU')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk",
+            "vhd": {
+              "uri": "[concat('http://', string(copyIndex()), 'd',variables('storageUnique'),'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'.osdisk.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat('db', copyindex(), 'Nic'))]"
+            }
+          ]
+        }
+      }
+    }
+
+
+
+  ]
+}
