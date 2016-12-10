@@ -15,71 +15,49 @@
         "description": "SSH rsa public key file as a string."
       }
     },
-    "dnsNameForPublicIP": {
-      "type": "string",
-      "minLength": 1,
+
+    "vnetConfig": {
+      "type": "object",
+      "defaultValue": {
+        "vnetAddressPrefix": "10.0.0.0/16",
+        "adminSubnetAddressPrefix": "10.0.1.0/24",
+        "appSubnetAddressPrefix": "10.0.2.0/24",
+        "dbSubnetAddressPrefix": "10.0.3.0/24"
+      },
       "metadata": {
-        "description": "Globally unique DNS Name for the Public IP used to access the Virtual Machine."
+        "description": "VnetPrefixes"
       }
     },
-    "vnetAddressPrefix": {
-      "type": "string",
-      "defaultValue": "10.0.0.0/16",
+    "dbDistroConfig": {
+      "type": "object",
+      "defaultValue": {
+        "imagePublisher": "Oracle",
+        "imageOffer": "Oracle-Linux",
+        "imageSKU": "7.2"
+      },
       "metadata": {
-        "description": "VNET prefix"
+        "description": "Db server Distro"
       }
     },
-    "adminSubnetAddressPrefix": {
-      "type": "string",
-      "defaultValue": "10.0.1.0/24",
+    "dbServerConfig": {
+      "type": "object",
+      "defaultValue": {
+        "vmSize": "Standard_DS2_v2",
+        "dataDisk1SizeGb": "512"
+      },
       "metadata": {
-        "description": "VNET prefix"
-      }
-    },
-    "appSubnetAddressPrefix": {
-      "type": "string",
-      "defaultValue": "10.0.2.0/24",
-      "metadata": {
-        "description": "VNET prefix"
-      }
-    },
-    "dbSubnetAddressPrefix": {
-      "type": "string",
-      "defaultValue": "10.0.3.0/24",
-      "metadata": {
-        "description": "VNET prefix"
-      }
-    },
-    "appStorageSku": {
-      "type": "string",
-      "defaultValue": "Standard_LRS",
-      "metadata": {
-        "description": "StorageSku for App"
-      }
-    },
-    "dbStorageSku": {
-      "type": "string",
-      "defaultValue": "Premium_LRS",
-      "metadata": {
-        "description": "StorageSku for DB"
-      }
-    },
-    "dbServerVmSize": {
-      "type": "string",
-      "defaultValue": "Standard_DS2_v2",
-      "metadata": {
-        "description": "VM Size (SKU) for Db server"
+        "description": "Db server VM Config"
       }
     },
     "dbServers": {
       "type": "array",
       "defaultValue": [
         {
-          "hostName": "k102-db1",
+          "hostName": "db1",
           "ip": "10.0.3.100"
         },
         {
-          "hostName": "xjb-db2",
+          "hostName": "db2",
           "ip": "10.0.3.110"
         }
       ],
@@ -87,12 +65,25 @@
         "description": "dabase servers"
       }
     },
-
-    "appServerVmSize": {
-      "type": "string",
-      "defaultValue": "Standard_D2_v2",
+    "appDistroConfig": {
+      "type": "object",
+      "defaultValue": {
+        "imagePublisher": "OpenLogic",
+        "imageOffer": "CentOS",
+        "imageSKU": "6.8"
+      },
       "metadata": {
-        "description": "VM Size (SKU) for app server"
+        "description": "App server Distro"
+      }
+    },
+
+    "appServerConfig": {
+      "type": "object",
+      "defaultValue": {
+        "vmSize": "Standard_D2_v2"
+      },
+      "metadata": {
+        "description": "App server configuration"
       }
     },
     "appServers": {
@@ -114,22 +105,39 @@
       "metadata": {
         "description": "app servers"
       }
+    },
+    "dbObserverConfig": {
+      "type": "object",
+      "defaultValue": {
+        "hostName": "db-observer",
+        "ip": "10.0.3.10",
+        "vmSize": "Standard_A1_v2"
+      },
+      "metadata": {
+        "description": "Oracle DB observer"
+      }
+    },
+    "jumpBoxConfig": {
+      "type": "object",
+      "defaultValue": {
+        "hostName": "JumpBox",
+        "ip": "10.0.1.10",
+        "vmSize": "Standard_A1_v2",
+        "dnsPrefix": "dr-ora11g"
+      },
+      "metadata": {
+        "description": "jumpBox VM"
+      }
     }
 
   },
   "variables": {
     "apiVersion": "2015-06-15",
 
-    "appImagePublisher": "OpenLogic",
-    "appImageOffer": "CentOS",
-    "appImageSKU": "6.8",
-
-    "dbImagePublisher": "Oracle",
-    "dbImageOffer": "Oracle-Linux",
-    "dbImageSKU": "7.2",
-
     "sshKeyPath": "[concat('/home/',parameters('adminUserName'),'/.ssh/authorized_keys')]",
-    "storageUnique": "[uniqueString(resourceGroup().id,'storage')]",
+
+    "standardStorageUnique": "[uniqueString(resourceGroup().id,'standard')]",
+    "premiumStorageUnique": "[uniqueString(resourceGroup().id,'premium')]",
 
     "vnetID": "[resourceId('Microsoft.Network/virtualNetworks','Vnet')]",
     "adminSubnetRef": "[concat(variables('vnetID'),'/subnets/AdminSubnet')]",
@@ -138,6 +146,22 @@
 
   },
   "resources": [
+
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[concat(parameters('jumpBoxConfig').hostName,'-pip')]",
+      "tags": {
+        "displayName": "JumpBoxPublicIP"
+      },
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('jumpBoxConfig').dnsPrefix]"
+        }
+      }
+    },
     {
       "apiVersion": "[variables('apiVersion')]",
       "type": "Microsoft.Compute/availabilitySets",
@@ -168,34 +192,26 @@
 
     {
       "type": "Microsoft.Storage/storageAccounts",
-      "name": "[concat(string(copyIndex()), 'a',variables('storageUnique'))]",
+      "name": "[variables('standardStorageUnique')]",
       "apiVersion": "2015-06-15",
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "StorageAccount"
-      },
-      "copy": {
-        "name": "appStorageLoop",
-        "count": "[length(parameters('dbServers'))]"
+        "displayName": "StandardStorageAccount"
       },
       "properties": {
-        "accountType": "[parameters('appStorageSku')]"
+        "accountType": "Standard_LRS"
       }
     },
     {
       "type": "Microsoft.Storage/storageAccounts",
-      "name": "[concat(string(copyIndex()), 'd',variables('storageUnique'))]",
+      "name": "[variables('premiumStorageUnique')]",
       "apiVersion": "2015-06-15",
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "StorageAccount"
-      },
-      "copy": {
-        "name": "dbStorageLoop",
-        "count": "[length(parameters('dbServers'))]"
+        "displayName": "PremiumStorageAccount"
       },
       "properties": {
-        "accountType": "[parameters('dbStorageSku')]"
+        "accountType": "Premium_LRS"
       }
     },
     {
@@ -210,26 +226,26 @@
       "properties": {
         "addressSpace": {
           "addressPrefixes": [
-            "[parameters('vnetAddressPrefix')]"
+            "[parameters('vnetConfig').vnetAddressPrefix]"
           ]
         },
         "subnets": [
           {
             "name": "AdminSubnet",
             "properties": {
-              "addressPrefix": "[parameters('adminSubnetAddressPrefix')]"
+              "addressPrefix": "[parameters('vnetConfig').adminSubnetAddressPrefix]"
             }
           },
           {
             "name": "AppSubnet",
             "properties": {
-              "addressPrefix": "[parameters('appSubnetAddressPrefix')]"
+              "addressPrefix": "[parameters('vnetConfig').appSubnetAddressPrefix]"
             }
           },
           {
             "name": "DbSubnet",
             "properties": {
-              "addressPrefix": "[parameters('dbSubnetAddressPrefix')]"
+              "addressPrefix": "[parameters('vnetConfig').dbSubnetAddressPrefix]"
             }
           }
         ]
@@ -241,7 +257,7 @@
       "name": "[concat(parameters('appServers')[copyindex()].hostName,'-nic')]",
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "NetworkInterface"
+        "displayName": "AppNetworkInterfaces"
       },
       "copy": {
         "name": "appNicLoop",
@@ -271,7 +287,7 @@
       "name": "[concat(parameters('dbServers')[copyindex()].hostName,'-nic')]",
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "NetworkInterface"
+        "displayName": "DbNetworkInterfaces"
       },
       "copy": {
         "name": "dbNicLoop",
@@ -298,10 +314,10 @@
     {
       "apiVersion": "[variables('apiVersion')]",
       "type": "Microsoft.Network/networkInterfaces",
-      "name": "jumbBox-nic",
+      "name": "[concat(parameters('dbObserverConfig').hostName,'-nic')]",
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "NetworkInterface"
+        "displayName": "DbObserverNetworkInterface"
       },
       "dependsOn": [
         "Microsoft.Network/virtualNetworks/Vnet"
@@ -311,7 +327,38 @@
           {
             "name": "ipconfig",
             "properties": {
-              "privateIPAllocationMethod": "Dynamic",
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[parameters('dbObserverConfig').ip]",
+              "subnet": {
+                "id": "[variables('dbSubnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('jumpBoxConfig').hostName,'-nic')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "JumpBoxNetworkInterface"
+      },
+      "dependsOn": [
+        "Microsoft.Network/virtualNetworks/Vnet",
+        "[concat('Microsoft.Network/publicIPAddresses/', parameters('jumpBoxConfig').hostName,'-pip')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses',concat(parameters('jumpBoxConfig').hostName,'-pip'))]"
+              },
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[parameters('jumpBoxConfig').ip]",
               "subnet": {
                 "id": "[variables('adminSubnetRef')]"
               }
@@ -331,10 +378,10 @@
       },
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "VirtualMachines"
+        "displayName": "AppVirtualMachines"
       },
       "dependsOn": [
-        "appStorageLoop",
+        "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
         "[concat('Microsoft.Network/networkInterfaces/', parameters('appServers')[copyindex()].hostName,'-nic')]",
         "Microsoft.Compute/availabilitySets/AppAvailabilitySet"
       ],
@@ -343,7 +390,7 @@
           "id": "[resourceId('Microsoft.Compute/availabilitySets','AppAvailabilitySet')]"
         },
         "hardwareProfile": {
-          "vmSize": "[parameters('appServerVmSize')]"
+          "vmSize": "[parameters('appServerConfig').vmSize]"
         },
         "osProfile": {
           "computerName": "[parameters('appServers')[copyindex()].hostName]",
@@ -362,15 +409,15 @@
         },
         "storageProfile": {
           "imageReference": {
-            "publisher": "[variables('appImagePublisher')]",
-            "offer": "[variables('appImageOffer')]",
-            "sku": "[variables('appImageSKU')]",
+            "publisher": "[parameters('appDistroConfig').imagePublisher]",
+            "offer": "[parameters('appDistroConfig').imageOffer]",
+            "sku": "[parameters('appDistroConfig').imageSKU]",
             "version": "latest"
           },
           "osDisk": {
             "name": "osdisk",
             "vhd": {
-              "uri": "[concat('http://', string(copyIndex()), 'a',variables('storageUnique'),'.blob.core.windows.net/vhds/',parameters('appServers')[copyindex()].hostName,'.osdisk.vhd')]"
+              "uri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net/vhds/',parameters('appServers')[copyindex()].hostName,'.osdisk.vhd')]"
             },
             "caching": "ReadWrite",
             "createOption": "FromImage"
@@ -379,7 +426,7 @@
         "networkProfile": {
           "networkInterfaces": [
             {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat('app', copyindex(), 'Nic'))]"
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('appServers')[copyindex()].hostName,'-nic'))]"
             }
           ]
         }
@@ -396,10 +443,11 @@
       },
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "VirtualMachines"
+        "displayName": "DbVirtualMachines"
       },
       "dependsOn": [
-        "dbStorageLoop",
+        "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
+        "[concat('Microsoft.Storage/storageAccounts/',variables('premiumStorageUnique'))]",
         "[concat('Microsoft.Network/networkInterfaces/', parameters('dbServers')[copyindex()].hostName,'-nic')]",
         "Microsoft.Compute/availabilitySets/DbAvailabilitySet"
       ],
@@ -408,7 +456,7 @@
           "id": "[resourceId('Microsoft.Compute/availabilitySets','DbAvailabilitySet')]"
         },
         "hardwareProfile": {
-          "vmSize": "[parameters('dbServerVmSize')]"
+          "vmSize": "[parameters('dbServerConfig').vmSize]"
         },
         "osProfile": {
           "computerName": "[parameters('dbServers')[copyindex()].hostName]",
@@ -427,31 +475,160 @@
         },
         "storageProfile": {
           "imageReference": {
-            "publisher": "[variables('dbImagePublisher')]",
-            "offer": "[variables('dbImageOffer')]",
-            "sku": "[variables('dbImageSKU')]",
+            "publisher": "[parameters('dbDistroConfig').imagePublisher]",
+            "offer": "[parameters('dbDistroConfig').imageOffer]",
+            "sku": "[parameters('dbDistroConfig').imageSKU]",
             "version": "latest"
           },
           "osDisk": {
             "name": "osdisk",
             "vhd": {
-              "uri": "[concat('http://', string(copyIndex()), 'd',variables('storageUnique'),'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'.osdisk.vhd')]"
+              "uri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'.osdisk.vhd')]"
             },
             "caching": "ReadWrite",
+            "createOption": "FromImage"
+          },
+          "dataDisks": [
+            {
+              "name": "datadisk1",
+              "diskSizeGB": "[parameters('dbServerConfig').dataDisk1SizeGb]",
+              "lun": 0,
+              "vhd": {
+                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'dataDisk1.vhd')]"
+              },
+              "caching": "ReadOnly",
+              "createOption": "Empty"
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('dbServers')[copyindex()].hostName,'-nic'))]"
+            }
+          ]
+        }
+      }
+    },
+
+
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('dbObserverConfig').hostName]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "DbObserverVirtualMachine"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('dbObserverConfig').hostName,'-nic'))]",
+        "Microsoft.Compute/availabilitySets/DbAvailabilitySet"
+      ],
+      "properties": {
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets','DbAvailabilitySet')]"
+        },
+        "hardwareProfile": {
+          "vmSize": "[parameters('dbObserverConfig').vmSize]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('dbObserverConfig').hostName]",
+          "adminUsername": "[parameters('adminUserName')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": "true",
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[variables('sshKeyPath')]",
+                  "keyData": "[parameters('sshKeyData')]"
+                }
+              ]
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[parameters('dbDistroConfig').imagePublisher]",
+            "offer": "[parameters('dbDistroConfig').imageOffer]",
+            "sku": "[parameters('dbDistroConfig').imageSKU]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk",
+            "vhd": {
+              "uri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net/vhds/',parameters('dbObserverConfig').hostName,'.osdisk.vhd')]"
+            },
+            "caching": "ReadOnly",
             "createOption": "FromImage"
           }
         },
         "networkProfile": {
           "networkInterfaces": [
             {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat('db', copyindex(), 'Nic'))]"
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('dbObserverConfig').hostName,'-nic'))]"
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('jumpBoxConfig').hostName]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "JumpBoxVirtualMachine"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('jumpBoxConfig').hostName,'-nic'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('jumpBoxConfig').vmSize]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('jumpBoxConfig').hostName]",
+          "adminUsername": "[parameters('adminUserName')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": "true",
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[variables('sshKeyPath')]",
+                  "keyData": "[parameters('sshKeyData')]"
+                }
+              ]
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[parameters('appDistroConfig').imagePublisher]",
+            "offer": "[parameters('appDistroConfig').imageOffer]",
+            "sku": "[parameters('appDistroConfig').imageSKU]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk",
+            "vhd": {
+              "uri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net/vhds/',parameters('jumpBoxConfig').hostName,'.osdisk.vhd')]"
+            },
+            "caching": "ReadOnly",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('jumpBoxConfig').hostName,'-nic'))]"
             }
           ]
         }
       }
     }
-
-
 
   ]
 }

@@ -29,8 +29,8 @@
       <Visible>False</Visible>
     </None>
     <Content Include="Deploy-AzureResourceGroup.ps1" />
-    <Content Include="LinuxVirtualMachine.json" />
-    <Content Include="LinuxVirtualMachine.parameters.json" />
+    <Content Include="oracle.json" />
+    <Content Include="oracle.primary-site.parameters.json" />
   </ItemGroup>
   <Target Name="GetReferenceAssemblyPaths" />
 </Project>
