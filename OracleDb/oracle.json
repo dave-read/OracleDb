@@ -42,8 +42,9 @@
     "dbServerConfig": {
       "type": "object",
       "defaultValue": {
-        "vmSize": "Standard_DS2_v2",
-        "dataDisk1SizeGb": "512"
+        "dataDiskSizeGb": "512",
+        "redoDiskSizeGb": "1024",
+        "fraDiskSizeGb": "512"
       },
       "metadata": {
         "description": "Db server VM Config"
@@ -53,12 +54,19 @@
       "type": "array",
       "defaultValue": [
         {
-          "hostName": "db1",
-          "ip": "10.0.3.100"
+          "hostName": "db-primary",
+          "ip": "10.0.3.100",
+          "vmSku": "Standard_DS3_v2"
         },
         {
-          "hostName": "db2",
-          "ip": "10.0.3.110"
+          "hostName": "db-secondary",
+          "ip": "10.0.3.110",
+          "vmSku": "Standard_DS3_v2"
+        },
+        {
+          "hostName": "db-shadow",
+          "ip": "10.0.3.111",
+          "vmSku": "Standard_DS2_v2"
         }
       ],
       "metadata": {
@@ -104,17 +112,6 @@
       ],
       "metadata": {
         "description": "app servers"
-      }
-    },
-    "dbObserverConfig": {
-      "type": "object",
-      "defaultValue": {
-        "hostName": "db-observer",
-        "ip": "10.0.3.10",
-        "vmSize": "Standard_A1_v2"
-      },
-      "metadata": {
-        "description": "Oracle DB observer"
       }
     },
     "jumpBoxConfig": {
@@ -180,16 +177,6 @@
         "displayName": "DbAvailabilitySet"
       }
     },
-    {
-      "apiVersion": "[variables('apiVersion')]",
-      "type": "Microsoft.Compute/availabilitySets",
-      "name": "AdminAvailabilitySet",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "AdminAvailabilitySet"
-      }
-    },
-
     {
       "type": "Microsoft.Storage/storageAccounts",
       "name": "[variables('standardStorageUnique')]",
@@ -303,32 +290,6 @@
             "properties": {
               "privateIPAllocationMethod": "Static",
               "privateIPAddress": "[parameters('dbServers')[copyindex()].ip]",
-              "subnet": {
-                "id": "[variables('dbSubnetRef')]"
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "apiVersion": "[variables('apiVersion')]",
-      "type": "Microsoft.Network/networkInterfaces",
-      "name": "[concat(parameters('dbObserverConfig').hostName,'-nic')]",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "DbObserverNetworkInterface"
-      },
-      "dependsOn": [
-        "Microsoft.Network/virtualNetworks/Vnet"
-      ],
-      "properties": {
-        "ipConfigurations": [
-          {
-            "name": "ipconfig",
-            "properties": {
-              "privateIPAllocationMethod": "Static",
-              "privateIPAddress": "[parameters('dbObserverConfig').ip]",
               "subnet": {
                 "id": "[variables('dbSubnetRef')]"
               }
@@ -456,7 +417,7 @@
           "id": "[resourceId('Microsoft.Compute/availabilitySets','DbAvailabilitySet')]"
         },
         "hardwareProfile": {
-          "vmSize": "[parameters('dbServerConfig').vmSize]"
+          "vmSize": "[parameters('dbServers')[copyindex()].vmSku]"
         },
         "osProfile": {
           "computerName": "[parameters('dbServers')[copyindex()].hostName]",
@@ -490,15 +451,37 @@
           },
           "dataDisks": [
             {
-              "name": "datadisk1",
-              "diskSizeGB": "[parameters('dbServerConfig').dataDisk1SizeGb]",
+              "name": "redoLogs",
+              "diskSizeGB": "[parameters('dbServerConfig').redoDiskSizeGb]",
               "lun": 0,
               "vhd": {
-                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'dataDisk1.vhd')]"
+                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'redo.vhd')]"
+              },
+              "caching": "ReadOnly",
+              "createOption": "Empty"
+            },
+            {
+              "name": "dataFiles",
+              "diskSizeGB": "[parameters('dbServerConfig').dataDiskSizeGb]",
+              "lun": 1,
+              "vhd": {
+                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'data.vhd')]"
+              },
+              "caching": "ReadOnly",
+              "createOption": "Empty"
+            },
+            {
+              "name": "fastRecoveryArea",
+              "diskSizeGB": "[parameters('dbServerConfig').fraDiskSizeGb]",
+              "lun": 2,
+              "vhd": {
+                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'fra.vhd')]"
               },
               "caching": "ReadOnly",
               "createOption": "Empty"
             }
+
+
           ]
         },
         "networkProfile": {
@@ -511,67 +494,6 @@
       }
     },
 
-
-    {
-      "apiVersion": "[variables('apiVersion')]",
-      "type": "Microsoft.Compute/virtualMachines",
-      "name": "[parameters('dbObserverConfig').hostName]",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "DbObserverVirtualMachine"
-      },
-      "dependsOn": [
-        "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
-        "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('dbObserverConfig').hostName,'-nic'))]",
-        "Microsoft.Compute/availabilitySets/DbAvailabilitySet"
-      ],
-      "properties": {
-        "availabilitySet": {
-          "id": "[resourceId('Microsoft.Compute/availabilitySets','DbAvailabilitySet')]"
-        },
-        "hardwareProfile": {
-          "vmSize": "[parameters('dbObserverConfig').vmSize]"
-        },
-        "osProfile": {
-          "computerName": "[parameters('dbObserverConfig').hostName]",
-          "adminUsername": "[parameters('adminUserName')]",
-          "linuxConfiguration": {
-            "disablePasswordAuthentication": "true",
-            "ssh": {
-              "publicKeys": [
-                {
-                  "path": "[variables('sshKeyPath')]",
-                  "keyData": "[parameters('sshKeyData')]"
-                }
-              ]
-            }
-          }
-        },
-        "storageProfile": {
-          "imageReference": {
-            "publisher": "[parameters('dbDistroConfig').imagePublisher]",
-            "offer": "[parameters('dbDistroConfig').imageOffer]",
-            "sku": "[parameters('dbDistroConfig').imageSKU]",
-            "version": "latest"
-          },
-          "osDisk": {
-            "name": "osdisk",
-            "vhd": {
-              "uri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net/vhds/',parameters('dbObserverConfig').hostName,'.osdisk.vhd')]"
-            },
-            "caching": "ReadOnly",
-            "createOption": "FromImage"
-          }
-        },
-        "networkProfile": {
-          "networkInterfaces": [
-            {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('dbObserverConfig').hostName,'-nic'))]"
-            }
-          ]
-        }
-      }
-    },
 
     {
       "apiVersion": "[variables('apiVersion')]",
