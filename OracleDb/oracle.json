@@ -15,15 +15,8 @@
         "description": "SSH rsa public key file as a string."
       }
     },
-
     "vnetConfig": {
       "type": "object",
-      "defaultValue": {
-        "vnetAddressPrefix": "10.0.0.0/16",
-        "adminSubnetAddressPrefix": "10.0.1.0/24",
-        "appSubnetAddressPrefix": "10.0.2.0/24",
-        "dbSubnetAddressPrefix": "10.0.3.0/24"
-      },
       "metadata": {
         "description": "VnetPrefixes"
       }
@@ -42,8 +35,8 @@
     "dbServerConfig": {
       "type": "object",
       "defaultValue": {
-        "dataDiskSizeGb": "512",
-        "redoDiskSizeGb": "1024",
+        "dataDiskSizeGb": "1023",
+        "redoDiskSizeGb": "512",
         "fraDiskSizeGb": "512"
       },
       "metadata": {
@@ -52,25 +45,8 @@
     },
     "dbServers": {
       "type": "array",
-      "defaultValue": [
-        {
-          "hostName": "db-primary",
-          "ip": "10.0.3.100",
-          "vmSku": "Standard_DS3_v2"
-        },
-        {
-          "hostName": "db-secondary",
-          "ip": "10.0.3.110",
-          "vmSku": "Standard_DS3_v2"
-        },
-        {
-          "hostName": "db-shadow",
-          "ip": "10.0.3.111",
-          "vmSku": "Standard_DS2_v2"
-        }
-      ],
       "metadata": {
-        "description": "dabase servers"
+        "description": "database servers"
       }
     },
     "appDistroConfig": {
@@ -84,7 +60,6 @@
         "description": "App server Distro"
       }
     },
-
     "appServerConfig": {
       "type": "object",
       "defaultValue": {
@@ -96,32 +71,12 @@
     },
     "appServers": {
       "type": "array",
-      "defaultValue": [
-        {
-          "hostName": "app1",
-          "ip": "10.0.2.10"
-        },
-        {
-          "hostName": "app2",
-          "ip": "10.0.2.11"
-        },
-        {
-          "hostName": "app3",
-          "ip": "10.0.2.12"
-        }
-      ],
       "metadata": {
         "description": "app servers"
       }
     },
     "jumpBoxConfig": {
       "type": "object",
-      "defaultValue": {
-        "hostName": "JumpBox",
-        "ip": "10.0.1.10",
-        "vmSize": "Standard_A1_v2",
-        "dnsPrefix": "dr-ora11g"
-      },
       "metadata": {
         "description": "jumpBox VM"
       }
@@ -136,10 +91,10 @@
     "standardStorageUnique": "[uniqueString(resourceGroup().id,'standard')]",
     "premiumStorageUnique": "[uniqueString(resourceGroup().id,'premium')]",
 
-    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks','Vnet')]",
-    "adminSubnetRef": "[concat(variables('vnetID'),'/subnets/AdminSubnet')]",
-    "appSubnetRef": "[concat(variables('vnetID'),'/subnets/AppSubnet')]",
-    "dbSubnetRef": "[concat(variables('vnetID'),'/subnets/DbSubnet')]"
+    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',parameters('vnetConfig').vnetName)]",
+    "adminSubnetRef": "[concat(variables('vnetID'),'/subnets/admin')]",
+    "appSubnetRef": "[concat(variables('vnetID'),'/subnets/app')]",
+    "dbSubnetRef": "[concat(variables('vnetID'),'/subnets/db')]"
 
   },
   "resources": [
@@ -149,7 +104,7 @@
       "type": "Microsoft.Network/publicIPAddresses",
       "name": "[concat(parameters('jumpBoxConfig').hostName,'-pip')]",
       "tags": {
-        "displayName": "JumpBoxPublicIP"
+        "displayName": "jumpbox-pip"
       },
       "location": "[resourceGroup().location]",
       "properties": {
@@ -162,19 +117,19 @@
     {
       "apiVersion": "[variables('apiVersion')]",
       "type": "Microsoft.Compute/availabilitySets",
-      "name": "AppAvailabilitySet",
+      "name": "app-as",
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "AppAvailabilitySet"
+        "displayName": "app-as"
       }
     },
     {
       "apiVersion": "[variables('apiVersion')]",
       "type": "Microsoft.Compute/availabilitySets",
-      "name": "DbAvailabilitySet",
+      "name": "db-as",
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "DbAvailabilitySet"
+        "displayName": "db-as"
       }
     },
     {
@@ -202,13 +157,13 @@
       }
     },
     {
-      "name": "Vnet",
+      "name": "[parameters('vnetConfig').vnetName]",
       "type": "Microsoft.Network/virtualNetworks",
       "location": "[resourceGroup().location]",
       "apiVersion": "2015-06-15",
       "dependsOn": [],
       "tags": {
-        "displayName": "Vnet"
+        "displayName": "[parameters('vnetConfig').vnetName]"
       },
       "properties": {
         "addressSpace": {
@@ -218,19 +173,19 @@
         },
         "subnets": [
           {
-            "name": "AdminSubnet",
+            "name": "admin",
             "properties": {
               "addressPrefix": "[parameters('vnetConfig').adminSubnetAddressPrefix]"
             }
           },
           {
-            "name": "AppSubnet",
+            "name": "app",
             "properties": {
               "addressPrefix": "[parameters('vnetConfig').appSubnetAddressPrefix]"
             }
           },
           {
-            "name": "DbSubnet",
+            "name": "db",
             "properties": {
               "addressPrefix": "[parameters('vnetConfig').dbSubnetAddressPrefix]"
             }
@@ -251,7 +206,7 @@
         "count": "[length(parameters('appServers'))]"
       },
       "dependsOn": [
-        "Microsoft.Network/virtualNetworks/Vnet"
+        "[variables('vnetID')]"
       ],
       "properties": {
         "ipConfigurations": [
@@ -281,7 +236,7 @@
         "count": "[length(parameters('dbServers'))]"
       },
       "dependsOn": [
-        "Microsoft.Network/virtualNetworks/Vnet"
+        "[variables('vnetID')]"
       ],
       "properties": {
         "ipConfigurations": [
@@ -307,7 +262,7 @@
         "displayName": "JumpBoxNetworkInterface"
       },
       "dependsOn": [
-        "Microsoft.Network/virtualNetworks/Vnet",
+        "[variables('vnetID')]",
         "[concat('Microsoft.Network/publicIPAddresses/', parameters('jumpBoxConfig').hostName,'-pip')]"
       ],
       "properties": {
@@ -344,11 +299,11 @@
       "dependsOn": [
         "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
         "[concat('Microsoft.Network/networkInterfaces/', parameters('appServers')[copyindex()].hostName,'-nic')]",
-        "Microsoft.Compute/availabilitySets/AppAvailabilitySet"
+        "Microsoft.Compute/availabilitySets/app-as"
       ],
       "properties": {
         "availabilitySet": {
-          "id": "[resourceId('Microsoft.Compute/availabilitySets','AppAvailabilitySet')]"
+          "id": "[resourceId('Microsoft.Compute/availabilitySets','app-as')]"
         },
         "hardwareProfile": {
           "vmSize": "[parameters('appServerConfig').vmSize]"
@@ -410,11 +365,11 @@
         "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
         "[concat('Microsoft.Storage/storageAccounts/',variables('premiumStorageUnique'))]",
         "[concat('Microsoft.Network/networkInterfaces/', parameters('dbServers')[copyindex()].hostName,'-nic')]",
-        "Microsoft.Compute/availabilitySets/DbAvailabilitySet"
+        "Microsoft.Compute/availabilitySets/db-as"
       ],
       "properties": {
         "availabilitySet": {
-          "id": "[resourceId('Microsoft.Compute/availabilitySets','DbAvailabilitySet')]"
+          "id": "[resourceId('Microsoft.Compute/availabilitySets','db-as')]"
         },
         "hardwareProfile": {
           "vmSize": "[parameters('dbServers')[copyindex()].vmSku]"
