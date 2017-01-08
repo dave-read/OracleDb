@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+
+    "vnetConfigs": {
+      "type": "array",
+      "metadata": {
+        "description": "VnetConfigurations"
+      }
+    }
+  },
+  "variables": {
+    "apiVersion": "2015-06-15"
+  },
+  "resources": [
+    {
+      "name": "[parameters('vnetConfigs')[copyindex()].vnetName]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[parameters('vnetConfigs')[copyindex()].location]",
+      "apiVersion": "2015-06-15",
+      "copy": {
+        "name": "vnetLoop",
+        "count": "[length(parameters('vnetConfigs'))]"
+      },
+      "dependsOn": [],
+      "tags": {
+        "displayName": "[parameters('vnetConfigs')[copyindex()].vnetName]"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetConfigs')[copyindex()].addressPrefix]"
+          ]
+        },
+        "subnets": "[take(parameters('vnetConfigs')[copyindex()].subnets,length(parameters('vnetConfigs')[copyindex()].subnets))]"
+      }
+    }
+  ]
+}

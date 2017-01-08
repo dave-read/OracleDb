@@ -1,0 +1,177 @@
+﻿{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vnet1": {
+      "type": "object",
+      "defaultValue": {
+        "name": "primary-site-vnet",
+        "location": "westus"
+      },
+      "metadata": {
+        "description": "First Vnet"
+      }
+    },
+    "vnet2": {
+      "type": "object",
+      "defaultValue": {
+        "name": "dr-site-vnet",
+        "location": "eastus"
+      },
+      "metadata": {
+        "description": "Second Vnet"
+      }
+    },
+    "sharedKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The shared key used to establish connection between the two VirtualNetworkGateways."
+      }
+    }
+  },
+  "variables": {
+    "apiVersion": "2015-06-15",
+    "gatewaySubnetName": "GatewaySubnet",
+
+    "vnet1GatewaySubnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets',parameters('vnet1').name,variables('gatewaySubnetName'))]",
+    "vnet1GatewayName": "[concat(parameters('vnet1').name,'-gw')]",
+    "vnet1GatewayRef": "[resourceId('Microsoft.Network/virtualNetworkGateways',variables('vnet1GatewayName'))]",
+    "vnet1GatewayPIPName": "[concat(variables('vnet1GatewayName'),'-pip')]",
+    "vnet1GatewayPIPRef": "[resourceId('Microsoft.Network/publicIPAddresses',variables('vnet1GatewayPIPName'))]",
+
+    "vnet2GatewaySubnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets',parameters('vnet2').name,variables('gatewaySubnetName'))]",
+    "vnet2GatewayName": "[concat(parameters('vnet2').name,'-gw')]",
+    "vnet2GatewayRef": "[resourceId('Microsoft.Network/virtualNetworkGateways',variables('vnet2GatewayName'))]",
+    "vnet2GatewayPIPName": "[concat(variables('vnet2GatewayName'),'-pip')]",
+    "vnet2GatewayPIPRef": "[resourceId('Microsoft.Network/publicIPAddresses',variables('vnet2GatewayPIPName'))]"
+  },
+  "resources": [
+
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('vnet1GatewayPIPName')]",
+      "location": "[parameters('vnet1').location]",
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('vnet2GatewayPIPName')]",
+      "location": "[parameters('vnet2').location]",
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/virtualNetworkGateways",
+      "name": "[variables('vnet1GatewayName')]",
+      "location": "[parameters('vnet1').location]",
+      "dependsOn": [
+        "[variables('vnet1GatewayPIPRef')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('vnet1GatewaySubnetRef')]"
+              },
+              "publicIPAddress": {
+                "id": "[variables('vnet1GatewayPIPRef')]"
+              }
+            },
+            "name": "vnetGatewayConfig1"
+          }
+        ],
+        "gatewayType": "Vpn",
+        "vpnType": "RouteBased",
+        "enableBgp": "false",
+        "sku": {
+          "name": "HighPerformance",
+          "tier": "HighPerformance",
+          "capacity": 2
+        }
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/virtualNetworkGateways",
+      "name": "[variables('vnet2GatewayName')]",
+      "location": "[parameters('vnet2').location]",
+      "dependsOn": [
+        "[variables('vnet2GatewayPIPRef')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('vnet2GatewaySubnetRef')]"
+              },
+              "publicIPAddress": {
+                "id": "[variables('vnet2GatewayPIPRef')]"
+              }
+            },
+            "name": "vnetGatewayConfig2"
+          }
+        ],
+        "gatewayType": "Vpn",
+        "vpnType": "RouteBased",
+        "enableBgp": "false",
+        "sku": {
+          "name": "HighPerformance",
+          "tier": "HighPerformance",
+          "capacity": 2
+        }
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/connections",
+      "name": "vnet1-vnet2",
+      "location": "[parameters('vnet1').location]",
+      "dependsOn": [
+        "[variables('vnet1GatewayRef')]",
+        "[variables('vnet2GatewayRef')]"
+      ],
+      "properties": {
+        "virtualNetworkGateway1": {
+          "id": "[variables('vnet1GatewayRef')]"
+        },
+        "virtualNetworkGateway2": {
+          "id": "[variables('vnet2GatewayRef')]"
+        },
+        "connectionType": "Vnet2Vnet",
+        "routingWeight": 3,
+        "sharedKey": "[parameters('sharedKey')]"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/connections",
+      "name": "vnet2-vnet1",
+      "location": "[parameters('vnet2').location]",
+      "dependsOn": [
+        "[variables('vnet1GatewayRef')]",
+        "[variables('vnet2GatewayRef')]"
+      ],
+      "properties": {
+        "virtualNetworkGateway1": {
+          "id": "[variables('vnet2GatewayRef')]"
+        },
+        "virtualNetworkGateway2": {
+          "id": "[variables('vnet1GatewayRef')]"
+        },
+        "connectionType": "Vnet2Vnet",
+        "routingWeight": 3,
+        "sharedKey": "[parameters('sharedKey')]"
+      }
+    }
+  ]
+}

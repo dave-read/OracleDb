@@ -25,12 +25,17 @@
   <Import Condition=" Exists('$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Deployment\1.1\DeploymentProject.targets') " Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Deployment\1.1\DeploymentProject.targets" />
   <!-- vertag<:>end -->
   <ItemGroup>
+    <None Include="connect-vnets.json" />
+    <None Include="connect-vnets.parameters.json" />
+    <None Include="deploy-primary.cmd" />
     <None Include="Deployment.targets">
       <Visible>False</Visible>
     </None>
     <Content Include="Deploy-AzureResourceGroup.ps1" />
     <Content Include="oracle.json" />
     <Content Include="oracle.primary-site.parameters.json" />
+    <None Include="oracle-infra.json" />
+    <None Include="oracle-infra.parameters.json" />
     <None Include="oracle.dr-site.parameters.json" />
   </ItemGroup>
   <Target Name="GetReferenceAssemblyPaths" />

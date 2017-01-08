@@ -91,7 +91,7 @@
     "standardStorageUnique": "[uniqueString(resourceGroup().id,'standard')]",
     "premiumStorageUnique": "[uniqueString(resourceGroup().id,'premium')]",
 
-    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',parameters('vnetConfig').vnetName)]",
+    "vnetID": "[resourceId(parameters('vnetConfig').resourceGroupName,'Microsoft.Network/virtualNetworks',parameters('vnetConfig').vnetName)]",
     "adminSubnetRef": "[concat(variables('vnetID'),'/subnets/admin')]",
     "appSubnetRef": "[concat(variables('vnetID'),'/subnets/app')]",
     "dbSubnetRef": "[concat(variables('vnetID'),'/subnets/db')]"
@@ -157,49 +157,6 @@
       }
     },
     {
-      "name": "[parameters('vnetConfig').vnetName]",
-      "type": "Microsoft.Network/virtualNetworks",
-      "location": "[resourceGroup().location]",
-      "apiVersion": "2015-06-15",
-      "dependsOn": [],
-      "tags": {
-        "displayName": "[parameters('vnetConfig').vnetName]"
-      },
-      "properties": {
-        "addressSpace": {
-          "addressPrefixes": [
-            "[parameters('vnetConfig').vnetAddressPrefix]"
-          ]
-        },
-        "subnets": [
-          {
-            "name": "admin",
-            "properties": {
-              "addressPrefix": "[parameters('vnetConfig').adminSubnetAddressPrefix]"
-            }
-          },
-          {
-            "name": "app",
-            "properties": {
-              "addressPrefix": "[parameters('vnetConfig').appSubnetAddressPrefix]"
-            }
-          },
-          {
-            "name": "db",
-            "properties": {
-              "addressPrefix": "[parameters('vnetConfig').dbSubnetAddressPrefix]"
-            }
-          },
-          {
-            "name": "GatewaySubnet",
-            "properties": {
-              "addressPrefix": "[parameters('vnetConfig').gwSubnetAddressPrefix]"
-            }
-          }
-        ]
-      }
-    },
-    {
       "apiVersion": "[variables('apiVersion')]",
       "type": "Microsoft.Network/networkInterfaces",
       "name": "[concat(parameters('appServers')[copyindex()].hostName,'-nic')]",
@@ -212,7 +169,6 @@
         "count": "[length(parameters('appServers'))]"
       },
       "dependsOn": [
-        "[variables('vnetID')]"
       ],
       "properties": {
         "ipConfigurations": [
@@ -242,7 +198,6 @@
         "count": "[length(parameters('dbServers'))]"
       },
       "dependsOn": [
-        "[variables('vnetID')]"
       ],
       "properties": {
         "ipConfigurations": [
@@ -268,7 +223,6 @@
         "displayName": "JumpBoxNetworkInterface"
       },
       "dependsOn": [
-        "[variables('vnetID')]",
         "[concat('Microsoft.Network/publicIPAddresses/', parameters('jumpBoxConfig').hostName,'-pip')]"
       ],
       "properties": {
