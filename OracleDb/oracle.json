@@ -189,6 +189,12 @@
             "properties": {
               "addressPrefix": "[parameters('vnetConfig').dbSubnetAddressPrefix]"
             }
+          },
+          {
+            "name": "GatewaySubnet",
+            "properties": {
+              "addressPrefix": "[parameters('vnetConfig').gwSubnetAddressPrefix]"
+            }
           }
         ]
       }
