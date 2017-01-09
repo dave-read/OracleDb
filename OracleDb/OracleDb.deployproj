@@ -34,6 +34,7 @@
     <Content Include="Deploy-AzureResourceGroup.ps1" />
     <Content Include="oracle.json" />
     <Content Include="oracle.primary-site.parameters.json" />
+    <None Include="hosts.txt" />
     <None Include="oracle-infra.json" />
     <None Include="oracle-infra.parameters.json" />
     <None Include="oracle.dr-site.parameters.json" />

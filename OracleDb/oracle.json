@@ -26,7 +26,7 @@
       "defaultValue": {
         "imagePublisher": "Oracle",
         "imageOffer": "Oracle-Linux",
-        "imageSKU": "7.2"
+        "imageSKU": "6.8"
       },
       "metadata": {
         "description": "Db server Distro"
@@ -99,21 +99,6 @@
   },
   "resources": [
 
-    {
-      "apiVersion": "[variables('apiVersion')]",
-      "type": "Microsoft.Network/publicIPAddresses",
-      "name": "[concat(parameters('jumpBoxConfig').hostName,'-pip')]",
-      "tags": {
-        "displayName": "jumpbox-pip"
-      },
-      "location": "[resourceGroup().location]",
-      "properties": {
-        "publicIPAllocationMethod": "Dynamic",
-        "dnsSettings": {
-          "domainNameLabel": "[parameters('jumpBoxConfig').dnsPrefix]"
-        }
-      }
-    },
     {
       "apiVersion": "[variables('apiVersion')]",
       "type": "Microsoft.Compute/availabilitySets",
@@ -214,35 +199,7 @@
         ]
       }
     },
-    {
-      "apiVersion": "[variables('apiVersion')]",
-      "type": "Microsoft.Network/networkInterfaces",
-      "name": "[concat(parameters('jumpBoxConfig').hostName,'-nic')]",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "JumpBoxNetworkInterface"
-      },
-      "dependsOn": [
-        "[concat('Microsoft.Network/publicIPAddresses/', parameters('jumpBoxConfig').hostName,'-pip')]"
-      ],
-      "properties": {
-        "ipConfigurations": [
-          {
-            "name": "ipconfig",
-            "properties": {
-              "publicIPAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIPAddresses',concat(parameters('jumpBoxConfig').hostName,'-pip'))]"
-              },
-              "privateIPAllocationMethod": "Static",
-              "privateIPAddress": "[parameters('jumpBoxConfig').ip]",
-              "subnet": {
-                "id": "[variables('adminSubnetRef')]"
-              }
-            }
-          }
-        ]
-      }
-    },
+
 
     {
       "apiVersion": "[variables('apiVersion')]",
@@ -407,65 +364,10 @@
           ]
         }
       }
-    },
-
-
-    {
-      "apiVersion": "[variables('apiVersion')]",
-      "type": "Microsoft.Compute/virtualMachines",
-      "name": "[parameters('jumpBoxConfig').hostName]",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "JumpBoxVirtualMachine"
-      },
-      "dependsOn": [
-        "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
-        "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('jumpBoxConfig').hostName,'-nic'))]"
-      ],
-      "properties": {
-        "hardwareProfile": {
-          "vmSize": "[parameters('jumpBoxConfig').vmSize]"
-        },
-        "osProfile": {
-          "computerName": "[parameters('jumpBoxConfig').hostName]",
-          "adminUsername": "[parameters('adminUserName')]",
-          "linuxConfiguration": {
-            "disablePasswordAuthentication": "true",
-            "ssh": {
-              "publicKeys": [
-                {
-                  "path": "[variables('sshKeyPath')]",
-                  "keyData": "[parameters('sshKeyData')]"
-                }
-              ]
-            }
-          }
-        },
-        "storageProfile": {
-          "imageReference": {
-            "publisher": "[parameters('appDistroConfig').imagePublisher]",
-            "offer": "[parameters('appDistroConfig').imageOffer]",
-            "sku": "[parameters('appDistroConfig').imageSKU]",
-            "version": "latest"
-          },
-          "osDisk": {
-            "name": "osdisk",
-            "vhd": {
-              "uri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net/vhds/',parameters('jumpBoxConfig').hostName,'.osdisk.vhd')]"
-            },
-            "caching": "ReadOnly",
-            "createOption": "FromImage"
-          }
-        },
-        "networkProfile": {
-          "networkInterfaces": [
-            {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('jumpBoxConfig').hostName,'-nic'))]"
-            }
-          ]
-        }
-      }
     }
+
+
+   
 
   ]
 }

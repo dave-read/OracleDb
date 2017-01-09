@@ -2,16 +2,42 @@
   "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-
+    "adminUsername": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "User name for the Virtual Machine."
+      }
+    },
+    "sshKeyData": {
+      "type": "string",
+      "metadata": {
+        "description": "SSH rsa public key file as a string."
+      }
+    },
     "vnetConfigs": {
       "type": "array",
       "metadata": {
         "description": "VnetConfigurations"
       }
+    },
+    "distroConfig": {
+      "type": "object",
+      "defaultValue": {
+        "imagePublisher": "OpenLogic",
+        "imageOffer": "CentOS",
+        "imageSKU": "6.8"
+      },
+      "metadata": {
+        "description": "App server Distro"
+      }
     }
+
   },
   "variables": {
-    "apiVersion": "2015-06-15"
+    "apiVersion": "2015-06-15",
+    "adminSubnetPath": "/subnets/admin",
+    "sshKeyPath": "[concat('/home/',parameters('adminUserName'),'/.ssh/authorized_keys')]",
   },
   "resources": [
     {
@@ -25,7 +51,7 @@
       },
       "dependsOn": [],
       "tags": {
-        "displayName": "[parameters('vnetConfigs')[copyindex()].vnetName]"
+        "displayName": "[concat('vnetStdStorage-',parameters('vnetConfigs')[copyindex()].vnetName)]"
       },
       "properties": {
         "addressSpace": {
@@ -34,6 +60,134 @@
           ]
         },
         "subnets": "[take(parameters('vnetConfigs')[copyindex()].subnets,length(parameters('vnetConfigs')[copyindex()].subnets))]"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-pip')]",
+      "copy": {
+        "name": "pipLoop",
+        "count": "[length(parameters('vnetConfigs'))]"
+      },
+      "tags": {
+        "displayName": "jumpbox-pip"
+      },
+      "location": "[parameters('vnetConfigs')[copyindex()].location]",
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('vnetConfigs')[copyindex()].jumpBoxConfig.dnsPrefix]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[uniqueString(resourceGroup().id,parameters('vnetConfigs')[copyindex()].vnetName)]",
+      "apiVersion": "2015-06-15",
+      "location": "[parameters('vnetConfigs')[copyindex()].location]",
+      "copy": {
+        "name": "storageLoop",
+        "count": "[length(parameters('vnetConfigs'))]"
+      },
+      "tags": {
+        "displayName": "[parameters('vnetConfigs')[copyindex()].vnetName]"
+      },
+      "properties": {
+        "accountType": "Standard_LRS"
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-nic')]",
+      "location": "[parameters('vnetConfigs')[copyindex()].location]",
+      "copy": {
+        "name": "nicLoop",
+        "count": "[length(parameters('vnetConfigs'))]"
+      },
+      "tags": {
+        "displayName": "JumpBoxNetworkInterface"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIPAddresses/', parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-pip')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses',concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-pip'))]"
+              },
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[parameters('vnetConfigs')[copyindex()].jumpBoxConfig.ip]",
+              "subnet": {
+                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks',parameters('vnetConfigs')[copyindex()].vnetName),variables('adminSubnetPath'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName]",
+      "location": "[parameters('vnetConfigs')[copyindex()].location]",
+      "copy": {
+        "name": "vmLoop",
+        "count": "[length(parameters('vnetConfigs'))]"
+      },
+      "tags": {
+        "displayName": "[parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName]"
+      },
+      "dependsOn": [
+        "vnetLoop",
+        "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-nic'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vnetConfigs')[copyindex()].jumpBoxConfig.vmSize]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName]",
+          "adminUsername": "[parameters('adminUserName')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": "true",
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[variables('sshKeyPath')]",
+                  "keyData": "[parameters('sshKeyData')]"
+                }
+              ]
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[parameters('distroConfig').imagePublisher]",
+            "offer": "[parameters('distroConfig').imageOffer]",
+            "sku": "[parameters('distroConfig').imageSKU]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk",
+            "vhd": {
+              "uri": "[concat('http://', uniqueString(resourceGroup().id,parameters('vnetConfigs')[copyindex()].vnetName),'.blob.core.windows.net/vhds/',parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'.osdisk.vhd')]"
+            },
+            "caching": "ReadOnly",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-nic'))]"
+            }
+          ]
+        }
       }
     }
   ]
