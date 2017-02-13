@@ -26,7 +26,7 @@
       "defaultValue": {
         "imagePublisher": "Oracle",
         "imageOffer": "Oracle-Linux",
-        "imageSKU": "6.8"
+        "imageSKU": "7.2"
       },
       "metadata": {
         "description": "Db server Distro"
@@ -36,8 +36,8 @@
       "type": "object",
       "defaultValue": {
         "dataDiskSizeGb": "1023",
-        "redoDiskSizeGb": "512",
-        "fraDiskSizeGb": "512"
+        "redoDiskSizeGb": "1023",
+        "fraDiskSizeGb": "1023"
       },
       "metadata": {
         "description": "Db server VM Config"
@@ -52,9 +52,9 @@
     "appDistroConfig": {
       "type": "object",
       "defaultValue": {
-        "imagePublisher": "OpenLogic",
-        "imageOffer": "CentOS",
-        "imageSKU": "6.8"
+        "imagePublisher": "Oracle",
+        "imageOffer": "Oracle-Linux",
+        "imageSKU": "7.2"
       },
       "metadata": {
         "description": "App server Distro"
@@ -73,12 +73,6 @@
       "type": "array",
       "metadata": {
         "description": "app servers"
-      }
-    },
-    "jumpBoxConfig": {
-      "type": "object",
-      "metadata": {
-        "description": "jumpBox VM"
       }
     }
 
@@ -329,27 +323,37 @@
               "vhd": {
                 "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'redo.vhd')]"
               },
-              "caching": "ReadOnly",
-              "createOption": "Empty"
-            },
-            {
-              "name": "dataFiles",
-              "diskSizeGB": "[parameters('dbServerConfig').dataDiskSizeGb]",
-              "lun": 1,
-              "vhd": {
-                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'data.vhd')]"
-              },
-              "caching": "ReadOnly",
+              "caching": "None",
               "createOption": "Empty"
             },
             {
               "name": "fastRecoveryArea",
               "diskSizeGB": "[parameters('dbServerConfig').fraDiskSizeGb]",
-              "lun": 2,
+              "lun": 1,
               "vhd": {
                 "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'fra.vhd')]"
               },
-              "caching": "ReadOnly",
+              "caching": "None",
+              "createOption": "Empty"
+            },
+            {
+              "name": "dataFile1",
+              "diskSizeGB": "[parameters('dbServerConfig').dataDiskSizeGb]",
+              "lun": 2,
+              "vhd": {
+                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'data1.vhd')]"
+              },
+              "caching": "None",
+              "createOption": "Empty"
+            },
+            {
+              "name": "dataFile2",
+              "diskSizeGB": "[parameters('dbServerConfig').dataDiskSizeGb]",
+              "lun": 3,
+              "vhd": {
+                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'data2.vhd')]"
+              },
+              "caching": "None",
               "createOption": "Empty"
             }
 

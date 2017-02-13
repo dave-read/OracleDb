@@ -24,9 +24,9 @@
     "distroConfig": {
       "type": "object",
       "defaultValue": {
-        "imagePublisher": "OpenLogic",
-        "imageOffer": "CentOS",
-        "imageSKU": "6.8"
+        "imagePublisher": "Oracle",
+        "imageOffer": "Oracle-Linux",
+        "imageSKU": "7.2"
       },
       "metadata": {
         "description": "App server Distro"

@@ -6,7 +6,7 @@
       "type": "object",
       "defaultValue": {
         "name": "primary-site-vnet",
-        "location": "westus"
+        "location": "northcentralus"
       },
       "metadata": {
         "description": "First Vnet"
@@ -16,7 +16,7 @@
       "type": "object",
       "defaultValue": {
         "name": "dr-site-vnet",
-        "location": "eastus"
+        "location": "southcentralus"
       },
       "metadata": {
         "description": "Second Vnet"
