@@ -79,11 +79,11 @@
   },
   "variables": {
     "apiVersion": "2015-06-15",
+    "managedDiskApiVersion" : "2016-04-30-preview",
 
     "sshKeyPath": "[concat('/home/',parameters('adminUserName'),'/.ssh/authorized_keys')]",
 
     "standardStorageUnique": "[uniqueString(resourceGroup().id,'standard')]",
-    "premiumStorageUnique": "[uniqueString(resourceGroup().id,'premium')]",
 
     "vnetID": "[resourceId(parameters('vnetConfig').resourceGroupName,'Microsoft.Network/virtualNetworks',parameters('vnetConfig').vnetName)]",
     "adminSubnetRef": "[concat(variables('vnetID'),'/subnets/admin')]",
@@ -94,19 +94,29 @@
   "resources": [
 
     {
-      "apiVersion": "[variables('apiVersion')]",
+      "apiVersion": "[variables('managedDiskApiVersion')]",
       "type": "Microsoft.Compute/availabilitySets",
       "name": "app-as",
       "location": "[resourceGroup().location]",
+      "properties":  {
+          "managed": "true",
+          "platformFaultDomainCount": "3",
+          "platformUpdateDomainCount": "18"
+      },
       "tags": {
         "displayName": "app-as"
       }
     },
     {
-      "apiVersion": "[variables('apiVersion')]",
+      "apiVersion": "[variables('managedDiskApiVersion')]",
       "type": "Microsoft.Compute/availabilitySets",
       "name": "db-as",
       "location": "[resourceGroup().location]",
+      "properties": {
+        "managed": "true",
+        "platformFaultDomainCount": "3",
+        "platformUpdateDomainCount": "18"
+      },
       "tags": {
         "displayName": "db-as"
       }
@@ -121,18 +131,6 @@
       },
       "properties": {
         "accountType": "Standard_LRS"
-      }
-    },
-    {
-      "type": "Microsoft.Storage/storageAccounts",
-      "name": "[variables('premiumStorageUnique')]",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "PremiumStorageAccount"
-      },
-      "properties": {
-        "accountType": "Premium_LRS"
       }
     },
     {
@@ -196,7 +194,7 @@
 
 
     {
-      "apiVersion": "[variables('apiVersion')]",
+      "apiVersion": "[variables('managedDiskApiVersion')]",
       "type": "Microsoft.Compute/virtualMachines",
       "name": "[parameters('appServers')[copyindex()].hostName]",
       "copy": {
@@ -242,12 +240,12 @@
             "version": "latest"
           },
           "osDisk": {
-            "name": "osdisk",
-            "vhd": {
-              "uri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net/vhds/',parameters('appServers')[copyindex()].hostName,'.osdisk.vhd')]"
-            },
+            "name": "[concat(parameters('appServers')[copyindex()].hostName,'-osdisk')]",
             "caching": "ReadWrite",
-            "createOption": "FromImage"
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Standard_LRS"
+            }
           }
         },
         "networkProfile": {
@@ -261,7 +259,7 @@
     },
 
     {
-      "apiVersion": "[variables('apiVersion')]",
+      "apiVersion": "[variables('managedDiskApiVersion')]",
       "type": "Microsoft.Compute/virtualMachines",
       "name": "[parameters('dbServers')[copyindex()].hostName]",
       "copy": {
@@ -274,7 +272,6 @@
       },
       "dependsOn": [
         "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
-        "[concat('Microsoft.Storage/storageAccounts/',variables('premiumStorageUnique'))]",
         "[concat('Microsoft.Network/networkInterfaces/', parameters('dbServers')[copyindex()].hostName,'-nic')]",
         "Microsoft.Compute/availabilitySets/db-as"
       ],
@@ -308,53 +305,53 @@
             "version": "latest"
           },
           "osDisk": {
-            "name": "osdisk",
-            "vhd": {
-              "uri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'.osdisk.vhd')]"
-            },
+            "name": "[concat(parameters('dbServers')[copyindex()].hostName,'-osdisk')]",
             "caching": "ReadWrite",
-            "createOption": "FromImage"
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Standard_LRS"
+            }
           },
           "dataDisks": [
             {
-              "name": "redoLogs",
+              "name": "[concat(parameters('dbServers')[copyindex()].hostName,'-redoLogs')]",
               "diskSizeGB": "[parameters('dbServerConfig').redoDiskSizeGb]",
               "lun": 0,
-              "vhd": {
-                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'redo.vhd')]"
-              },
               "caching": "None",
-              "createOption": "Empty"
+              "createOption": "Empty",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
             },
             {
-              "name": "fastRecoveryArea",
+              "name": "[concat(parameters('dbServers')[copyindex()].hostName,'-fastRecoveryArea')]",
               "diskSizeGB": "[parameters('dbServerConfig').fraDiskSizeGb]",
               "lun": 1,
-              "vhd": {
-                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'fra.vhd')]"
-              },
               "caching": "None",
-              "createOption": "Empty"
+              "createOption": "Empty",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
             },
             {
-              "name": "dataFile1",
+              "name": "[concat(parameters('dbServers')[copyindex()].hostName,'-dataFile1')]",
               "diskSizeGB": "[parameters('dbServerConfig').dataDiskSizeGb]",
               "lun": 2,
-              "vhd": {
-                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'data1.vhd')]"
-              },
               "caching": "None",
-              "createOption": "Empty"
+              "createOption": "Empty",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
             },
             {
-              "name": "dataFile2",
+              "name": "[concat(parameters('dbServers')[copyindex()].hostName,'-dataFile2')]",
               "diskSizeGB": "[parameters('dbServerConfig').dataDiskSizeGb]",
               "lun": 3,
-              "vhd": {
-                "uri": "[concat('http://', variables('premiumStorageUnique') ,'.blob.core.windows.net/vhds/',parameters('dbServers')[copyindex()].hostName,'data2.vhd')]"
-              },
               "caching": "None",
-              "createOption": "Empty"
+              "createOption": "Empty",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
             }
 
 
