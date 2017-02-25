@@ -36,8 +36,9 @@
   },
   "variables": {
     "apiVersion": "2015-06-15",
+    "managedDiskApiVersion": "2016-04-30-preview",
     "adminSubnetPath": "/subnets/admin",
-    "sshKeyPath": "[concat('/home/',parameters('adminUserName'),'/.ssh/authorized_keys')]",
+    "sshKeyPath": "[concat('/home/',parameters('adminUserName'),'/.ssh/authorized_keys')]"
   },
   "resources": [
     {
@@ -91,7 +92,7 @@
         "count": "[length(parameters('vnetConfigs'))]"
       },
       "tags": {
-        "displayName": "[parameters('vnetConfigs')[copyindex()].vnetName]"
+        "displayName": "[concat(parameters('vnetConfigs')[copyindex()].vnetName,'-diag')]"
       },
       "properties": {
         "accountType": "Standard_LRS"
@@ -131,7 +132,7 @@
       }
     },
     {
-      "apiVersion": "[variables('apiVersion')]",
+      "apiVersion": "[variables('managedDiskApiVersion')]",
       "type": "Microsoft.Compute/virtualMachines",
       "name": "[parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName]",
       "location": "[parameters('vnetConfigs')[copyindex()].location]",
@@ -144,7 +145,8 @@
       },
       "dependsOn": [
         "vnetLoop",
-        "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-nic'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-nic'))]",
+        "[concat('Microsoft.Storage/storageAccounts/',uniqueString(resourceGroup().id,parameters('vnetConfigs')[copyindex()].vnetName))]"
       ],
       "properties": {
         "hardwareProfile": {
@@ -173,9 +175,9 @@
             "version": "latest"
           },
           "osDisk": {
-            "name": "osdisk",
-            "vhd": {
-              "uri": "[concat('http://', uniqueString(resourceGroup().id,parameters('vnetConfigs')[copyindex()].vnetName),'.blob.core.windows.net/vhds/',parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'.osdisk.vhd')]"
+            "name": "[concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-osdisk')]",
+            "managedDisk": {
+              "storageAccountType": "Standard_LRS"
             },
             "caching": "ReadOnly",
             "createOption": "FromImage"
@@ -187,6 +189,12 @@
               "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-nic'))]"
             }
           ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": "true",
+            "storageUri": "[concat('http://', uniqueString(resourceGroup().id,parameters('vnetConfigs')[copyindex()].vnetName),'.blob.core.windows.net')]"
+          }
         }
       }
     }

@@ -127,7 +127,7 @@
       "apiVersion": "2015-06-15",
       "location": "[resourceGroup().location]",
       "tags": {
-        "displayName": "StandardStorageAccount"
+        "displayName": "[concat('diag-',variables('standardStorageUnique'))]"
       },
       "properties": {
         "accountType": "Standard_LRS"
@@ -254,7 +254,14 @@
               "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('appServers')[copyindex()].hostName,'-nic'))]"
             }
           ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": "true",
+            "storageUri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net')]"
+          }
         }
+
       }
     },
 
@@ -363,7 +370,14 @@
               "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('dbServers')[copyindex()].hostName,'-nic'))]"
             }
           ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": "true",
+            "storageUri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net')]"
+          }
         }
+
       }
     }
 
