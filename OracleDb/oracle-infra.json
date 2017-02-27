@@ -29,7 +29,7 @@
         "imageSKU": "7.2"
       },
       "metadata": {
-        "description": "App server Distro"
+        "description": "jumpbox distro"
       }
     }
 
@@ -84,7 +84,7 @@
     },
     {
       "type": "Microsoft.Storage/storageAccounts",
-      "name": "[uniqueString(resourceGroup().id,parameters('vnetConfigs')[copyindex()].vnetName)]",
+      "name": "[uniqueString(resourceGroup().name,parameters('vnetConfigs')[copyindex()].vnetName)]",
       "apiVersion": "2015-06-15",
       "location": "[parameters('vnetConfigs')[copyindex()].location]",
       "copy": {
@@ -146,7 +146,7 @@
       "dependsOn": [
         "vnetLoop",
         "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('vnetConfigs')[copyindex()].jumpBoxConfig.hostName,'-nic'))]",
-        "[concat('Microsoft.Storage/storageAccounts/',uniqueString(resourceGroup().id,parameters('vnetConfigs')[copyindex()].vnetName))]"
+        "[concat('Microsoft.Storage/storageAccounts/',uniqueString(resourceGroup().name,parameters('vnetConfigs')[copyindex()].vnetName))]"
       ],
       "properties": {
         "hardwareProfile": {
@@ -193,7 +193,7 @@
         "diagnosticsProfile": {
           "bootDiagnostics": {
             "enabled": "true",
-            "storageUri": "[concat('http://', uniqueString(resourceGroup().id,parameters('vnetConfigs')[copyindex()].vnetName),'.blob.core.windows.net')]"
+            "storageUri": "[concat('http://', uniqueString(resourceGroup().name,parameters('vnetConfigs')[copyindex()].vnetName),'.blob.core.windows.net')]"
           }
         }
       }

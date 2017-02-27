@@ -1,2 +1,2 @@
-REM azure group create -n OracleDB -l "West US2"
-azure group deployment create -f oracle.json -e oracle.primary-site.parameters.json OracleDB OracleDB
+call azure group create -n Oracle-12c-primary -l northcentralus
+call azure group deployment create -f oracle.json -e oracle.primary-site.parameters.json Oracle-12c-primary Oracle-12c-primary

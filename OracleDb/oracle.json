@@ -83,8 +83,6 @@
 
     "sshKeyPath": "[concat('/home/',parameters('adminUserName'),'/.ssh/authorized_keys')]",
 
-    "standardStorageUnique": "[uniqueString(resourceGroup().id,'standard')]",
-
     "vnetID": "[resourceId(parameters('vnetConfig').resourceGroupName,'Microsoft.Network/virtualNetworks',parameters('vnetConfig').vnetName)]",
     "adminSubnetRef": "[concat(variables('vnetID'),'/subnets/admin')]",
     "appSubnetRef": "[concat(variables('vnetID'),'/subnets/app')]",
@@ -119,18 +117,6 @@
       },
       "tags": {
         "displayName": "db-as"
-      }
-    },
-    {
-      "type": "Microsoft.Storage/storageAccounts",
-      "name": "[variables('standardStorageUnique')]",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "[concat('diag-',variables('standardStorageUnique'))]"
-      },
-      "properties": {
-        "accountType": "Standard_LRS"
       }
     },
     {
@@ -206,7 +192,6 @@
         "displayName": "AppVirtualMachines"
       },
       "dependsOn": [
-        "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
         "[concat('Microsoft.Network/networkInterfaces/', parameters('appServers')[copyindex()].hostName,'-nic')]",
         "Microsoft.Compute/availabilitySets/app-as"
       ],
@@ -258,7 +243,7 @@
         "diagnosticsProfile": {
           "bootDiagnostics": {
             "enabled": "true",
-            "storageUri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net')]"
+            "storageUri": "[concat('http://', uniqueString(parameters('vnetConfig').resourceGroupName,parameters('vnetConfig').vnetName),'.blob.core.windows.net')]"
           }
         }
 
@@ -278,7 +263,6 @@
         "displayName": "DbVirtualMachines"
       },
       "dependsOn": [
-        "[concat('Microsoft.Storage/storageAccounts/',variables('standardStorageUnique'))]",
         "[concat('Microsoft.Network/networkInterfaces/', parameters('dbServers')[copyindex()].hostName,'-nic')]",
         "Microsoft.Compute/availabilitySets/db-as"
       ],
@@ -374,7 +358,7 @@
         "diagnosticsProfile": {
           "bootDiagnostics": {
             "enabled": "true",
-            "storageUri": "[concat('http://', variables('standardStorageUnique'),'.blob.core.windows.net')]"
+            "storageUri": "[concat('http://', uniqueString(parameters('vnetConfig').resourceGroupName,parameters('vnetConfig').vnetName),'.blob.core.windows.net')]"
           }
         }
 
